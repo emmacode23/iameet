@@ -4,14 +4,14 @@ WORKDIR /app
 COPY . .
 RUN mvn clean package -DskipTests
 
-# Étape 2 : Exécution avec Java 21 (JRE léger)
-FROM eclipse-temurin:21-jre-alpine
+# Étape 2 : Exécution avec Java 21 (Image standard pour stabilité)
+FROM eclipse-temurin:21-jre
 WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
 
-# Configuration des variables d'environnement (Cloud)
+# Configuration des variables d'environnement
 ENV PORT=8080
 EXPOSE 8080
 
-# Commande de lancement
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# Commande de lancement avec optimisation mémoire pour petit serveur
+ENTRYPOINT ["java", "-Xmx512m", "-jar", "app.jar"]
