@@ -31,7 +31,7 @@
         .msg-me { align-self: flex-end; background: #e3f2fd; border: 1px solid #cce5ff; }
         .msg-other { align-self: flex-start; background: #f1f3f4; border: 1px solid #ddd; }
         .msg-system { align-self: center; background: transparent; color: #70757a; font-style: italic; font-size: 0.8rem; }
-        .translation-panel { padding: 10px; border-bottom: 1px solid #ddd; background: #fff3e0; }
+        .translation-panel { padding: 10px; border-bottom: 1px solid #ddd; background: #fff3e0; color: black; }
     </style>
 </head>
 <body>
@@ -50,7 +50,6 @@
         <div class="chat-sidebar" id="chatSidebar">
             <div class="chat-header">Options & Chat</div>
             
-            <!-- Panel de Traduction -->
             <div class="translation-panel">
                 <div class="mb-2">
                     <label class="form-label small fw-bold mb-1">Ma langue</label>
@@ -93,16 +92,15 @@
     </div>
 
     <script th:inline="javascript">
+        /*<![CDATA[*/
         const ROOM_ID = [[${roomId}]];
-        const AUTH_USER = [[${#authentication.name}]];
+        const AUTH_USER = [[${#authentication != null ? #authentication.name : 'anonymousUser'}]];
         const USERNAME = (AUTH_USER && AUTH_USER !== 'anonymousUser') ? AUTH_USER : 'Invite_' + Math.floor(Math.random() * 100);
         
         let localStream;
         let myPeer;
         const peers = {};
         let stompClient = null;
-
-        // Variables pour la traduction
         let mediaRecorder;
         let isTranslating = false;
         let translationInterval;
@@ -161,8 +159,6 @@
             });
         }
 
-        // --- LOGIQUE DE TRADUCTION ---
-
         document.getElementById('toggleTranslation').onclick = function() {
             if (!isTranslating) {
                 startTranslation();
@@ -179,27 +175,23 @@
         function startTranslation() {
             const sourceLang = document.getElementById('sourceLang').value;
             const targetLang = document.getElementById('targetLang').value;
-
-            // On enregistre par morceaux de 3 secondes
             mediaRecorder = new MediaRecorder(localStream);
             mediaRecorder.ondataavailable = (event) => {
                 if (event.data.size > 0) {
                     sendAudioToTranslate(event.data, sourceLang, targetLang);
                 }
             };
-
             translationInterval = setInterval(() => {
-                mediaRecorder.stop();
+                if(mediaRecorder.state === 'recording') mediaRecorder.stop();
                 mediaRecorder.start();
             }, 3000);
-
             mediaRecorder.start();
             appendMessage('Système', 'Traduction activée...', false, 'system');
         }
 
         function stopTranslation() {
             clearInterval(translationInterval);
-            if (mediaRecorder) mediaRecorder.stop();
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
             appendMessage('Système', 'Traduction désactivée.', false, 'system');
         }
 
@@ -208,45 +200,30 @@
             reader.readAsDataURL(audioBlob);
             reader.onloadend = async () => {
                 const base64Audio = reader.result.split(',')[1];
-                
                 try {
                     const response = await fetch('/api/translate/audio', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            audio: base64Audio,
-                            sourceLang: sourceLang,
-                            targetLang: targetLang
+                            audio: base64Audio, sourceLang: sourceLang, targetLang: targetLang
                         })
                     });
-
                     const data = await response.json();
                     if (data.original) {
-                        // Afficher dans le chat
-                        appendMessage('IA (Original)', data.original, true, 'chat');
-                        appendMessage('IA (Traduit)', data.translated, false, 'chat');
-                        
-                        // Envoyer aux autres via WebSocket
+                        appendMessage('IA (Moi)', data.original + ' -> ' + data.translated, true, 'chat');
                         stompClient.send("/app/chat.sendMessage", {}, JSON.stringify({
-                            roomId: ROOM_ID,
-                            sender: 'Traducteur IA',
+                            roomId: ROOM_ID, sender: 'Traducteur IA',
                             content: `[${sourceLang} -> ${targetLang}] : ${data.translated}`,
                             type: 'CHAT'
                         }));
-
-                        // Jouer l'audio traduit
                         if (data.audio) {
                             const audio = new Audio("data:audio/wav;base64," + data.audio);
                             audio.play();
                         }
                     }
-                } catch (error) {
-                    console.error('Erreur traduction:', error);
-                }
+                } catch (error) { console.error('Erreur traduction:', error); }
             };
         }
-
-        // --- FIN LOGIQUE TRADUCTION ---
 
         function handleIncomingMessage(message) {
             if (message.type === 'CHAT') {
@@ -307,17 +284,18 @@
         document.getElementById('toggleMic').onclick = function() {
             const enabled = localStream.getAudioTracks()[0].enabled;
             localStream.getAudioTracks()[0].enabled = !enabled;
-            this.classList.toggle('active', enabled);
-            this.innerHTML = enabled ? '<i class="bi bi-mic-mute-fill"></i>' : '<i class="bi bi-mic-fill"></i>';
+            this.classList.toggle('active', !enabled);
+            this.innerHTML = !enabled ? '<i class="bi bi-mic-mute-fill"></i>' : '<i class="bi bi-mic-fill"></i>';
         };
         document.getElementById('toggleCam').onclick = function() {
             const enabled = localStream.getVideoTracks()[0].enabled;
             localStream.getVideoTracks()[0].enabled = !enabled;
-            this.classList.toggle('active', enabled);
-            this.innerHTML = enabled ? '<i class="bi bi-camera-video-off-fill"></i>' : '<i class="bi bi-camera-video-fill"></i>';
+            this.classList.toggle('active', !enabled);
+            this.innerHTML = !enabled ? '<i class="bi bi-camera-video-off-fill"></i>' : '<i class="bi bi-camera-video-fill"></i>';
         };
 
         connectWebSocket();
+        /*]]>*/
     </script>
 </body>
 </html>
