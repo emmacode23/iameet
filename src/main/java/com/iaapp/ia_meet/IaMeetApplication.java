@@ -12,22 +12,29 @@ import java.io.File;
 public class IaMeetApplication {
 
 	public static void main(String[] args) {
+		// Correction automatique de l'URL MySQL de Railway avant le démarrage
+		String mysqlUrl = System.getenv("MYSQL_URL");
+		if (mysqlUrl != null && mysqlUrl.startsWith("mysql://")) {
+			String jdbcUrl = "jdbc:" + mysqlUrl;
+			System.setProperty("spring.datasource.url", jdbcUrl);
+			System.out.println("URL MySQL corrigée automatiquement en JDBC.");
+		}
+		
 		SpringApplication.run(IaMeetApplication.class, args);
 	}
 
 	@PostConstruct
 	public void init() {
-		// Cette logique permet de créer le fichier de clé Google Cloud 
-		// à partir d'une variable d'environnement sur Railway/Cloud
+		// Gestion de la clé Google Cloud
 		String credentialsJson = System.getenv("GOOGLE_CREDENTIALS_CONTENT");
 		if (credentialsJson != null && !credentialsJson.isEmpty()) {
 			try {
 				String path = "google-credentials.json";
 				Files.write(Paths.get(path), credentialsJson.getBytes());
 				System.setProperty("GOOGLE_APPLICATION_CREDENTIALS", new File(path).getAbsolutePath());
-				System.out.println("Google Cloud Credentials configurées avec succès depuis les variables d'environnement.");
+				System.out.println("Google Cloud Credentials configurées.");
 			} catch (IOException e) {
-				System.err.println("Erreur lors de la création du fichier de credentials Google : " + e.getMessage());
+				System.err.println("Erreur credentials Google : " + e.getMessage());
 			}
 		}
 	}
