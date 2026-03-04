@@ -8,5 +8,6 @@ import java.util.List;
 
 @Repository
 public interface MessageRepository extends JpaRepository<Message, Long> {
-    List<Message> findByRoomIdOrderByTimestampAsc(String roomId);
+    // Cette méthode permet de trouver les messages par le roomId de l'entité Meet associée
+    List<Message> findByMeet_RoomIdOrderByTimestampAsc(String roomId);
 }
