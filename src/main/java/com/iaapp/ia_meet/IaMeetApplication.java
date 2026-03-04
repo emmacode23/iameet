@@ -12,15 +12,19 @@ import java.io.File;
 public class IaMeetApplication {
 
 	public static void main(String[] args) {
-		// Correction automatique de l'URL MySQL de Railway avant le démarrage
+		String port = System.getenv("PORT");
+		System.out.println("Démarrage de l'application sur le port : " + (port != null ? port : "8080"));
+		
+		// Correction automatique de l'URL MySQL de Railway
 		String mysqlUrl = System.getenv("MYSQL_URL");
 		if (mysqlUrl != null && mysqlUrl.startsWith("mysql://")) {
 			String jdbcUrl = "jdbc:" + mysqlUrl;
 			System.setProperty("spring.datasource.url", jdbcUrl);
-			System.out.println("URL MySQL corrigée automatiquement en JDBC.");
+			System.out.println("URL MySQL détectée et convertie.");
 		}
 		
 		SpringApplication.run(IaMeetApplication.class, args);
+		System.out.println("Application Ia-Meet démarrée avec succès !");
 	}
 
 	@PostConstruct
